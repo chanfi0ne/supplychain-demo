@@ -1,0 +1,18 @@
+# Keys (NEVER commit private keys)
+keys/
+
+# Scan reports
+reports/
+
+# Backup files
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

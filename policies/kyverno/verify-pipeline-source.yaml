@@ -1,0 +1,42 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-pipeline-source
+  annotations:
+    policies.kyverno.io/title: Verify Pipeline Source
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Verifies that images were built through an approved CI/CD pipeline
+      by checking the signature annotations.
+spec:
+  validationFailureAction: Enforce
+  webhookTimeoutSeconds: 30
+  background: false
+  rules:
+    - name: check-pipeline-annotation
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - demo
+                - production
+      verifyImages:
+        - imageReferences:
+            - "localhost:5000/*"
+            - "*.dkr.ecr.*.amazonaws.com/*"
+          attestors:
+            - count: 1
+              entries:
+                - keys:
+                    publicKeys: |-
+                      -----BEGIN PUBLIC KEY-----
+                      # Replace with your cosign.pub content
+                      -----END PUBLIC KEY-----
+                    rekor:
+                      ignoreTlog: true
+                  annotations:
+                    # Verify the image was built through an approved pipeline
+                    pipeline: "demo-build|harness-*"

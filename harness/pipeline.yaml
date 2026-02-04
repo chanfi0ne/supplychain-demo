@@ -1,0 +1,213 @@
+pipeline:
+  name: Supply Chain Demo Build
+  identifier: supply_chain_demo_build
+  projectIdentifier: YOUR_PROJECT
+  orgIdentifier: YOUR_ORG
+  tags: {}
+  properties:
+    ci:
+      codebase:
+        connectorRef: YOUR_GIT_CONNECTOR
+        repoName: supply-chain-demo
+        build: <+input>
+  stages:
+    - stage:
+        name: Build and Attest
+        identifier: build_and_attest
+        type: CI
+        spec:
+          cloneCodebase: true
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: YOUR_K8S_CONNECTOR
+              namespace: harness-builds
+              automountServiceAccountToken: true
+          execution:
+            steps:
+              # Build the container image
+              - step:
+                  type: BuildAndPushDockerRegistry
+                  name: Build Image
+                  identifier: build_image
+                  spec:
+                    connectorRef: YOUR_REGISTRY_CONNECTOR
+                    repo: <+pipeline.variables.registry>/<+pipeline.variables.image_name>
+                    tags:
+                      - <+pipeline.variables.version>
+                    dockerfile: app/Dockerfile
+                    context: app
+
+              # Generate SBOM with Syft
+              - step:
+                  type: Run
+                  name: Generate SBOM
+                  identifier: generate_sbom
+                  spec:
+                    connectorRef: YOUR_DOCKER_CONNECTOR
+                    image: anchore/syft:latest
+                    command: |
+                      syft <+pipeline.variables.registry>/<+pipeline.variables.image_name>:<+pipeline.variables.version> \
+                        -o cyclonedx-json > /harness/sbom.json
+                    outputVariables:
+                      - name: sbom_path
+                        type: String
+                        value: /harness/sbom.json
+
+              # Scan for vulnerabilities with Grype
+              - step:
+                  type: Run
+                  name: Vulnerability Scan
+                  identifier: vuln_scan
+                  spec:
+                    connectorRef: YOUR_DOCKER_CONNECTOR
+                    image: anchore/grype:latest
+                    command: |
+                      IMAGE="<+pipeline.variables.registry>/<+pipeline.variables.image_name>:<+pipeline.variables.version>"
+
+                      # Run grype scan
+                      grype $IMAGE -o json > /harness/vulns.json
+
+                      # Extract counts
+                      CRITICAL=$(jq '[.matches[] | select(.vulnerability.severity=="Critical")] | length' /harness/vulns.json)
+                      CRITICAL_NO_FIX=$(jq '[.matches[] | select(.vulnerability.severity=="Critical" and .vulnerability.fix.state=="not-fixed")] | length' /harness/vulns.json)
+                      HIGH=$(jq '[.matches[] | select(.vulnerability.severity=="High")] | length' /harness/vulns.json)
+
+                      echo "Vulnerabilities: Critical=$CRITICAL (no-fix=$CRITICAL_NO_FIX), High=$HIGH"
+
+                      # Create attestation predicate
+                      cat > /harness/vuln-predicate.json << EOF
+                      {
+                        "scanner": "grype",
+                        "scanTimestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+                        "image": "$IMAGE",
+                        "pipelineId": "<+pipeline.identifier>",
+                        "executionId": "<+pipeline.executionId>",
+                        "summary": {
+                          "critical": $CRITICAL,
+                          "criticalWithoutFix": $CRITICAL_NO_FIX,
+                          "high": $HIGH
+                        },
+                        "passesPolicy": $([ "$CRITICAL_NO_FIX" -le 1 ] && echo "true" || echo "false")
+                      }
+                      EOF
+
+                      # Fail if policy not met
+                      if [ "$CRITICAL_NO_FIX" -gt 1 ]; then
+                        echo "POLICY VIOLATION: More than 1 critical vulnerability without fix"
+                        exit 1
+                      fi
+                    outputVariables:
+                      - name: critical_count
+                        type: String
+                        value: $CRITICAL
+                      - name: critical_no_fix_count
+                        type: String
+                        value: $CRITICAL_NO_FIX
+
+              # Sign the image with Cosign
+              - step:
+                  type: Run
+                  name: Sign Image
+                  identifier: sign_image
+                  spec:
+                    connectorRef: YOUR_DOCKER_CONNECTOR
+                    image: gcr.io/projectsigstore/cosign:v2.2.3
+                    command: |
+                      IMAGE="<+pipeline.variables.registry>/<+pipeline.variables.image_name>:<+pipeline.variables.version>"
+
+                      # Sign the image (key-based, no transparency log)
+                      cosign sign --key /harness/cosign.key \
+                        --tlog-upload=false \
+                        -a "pipeline=harness-<+pipeline.identifier>" \
+                        -a "execution=<+pipeline.executionId>" \
+                        -a "scanner=grype" \
+                        -a "critical=<+execution.steps.vuln_scan.output.outputVariables.critical_count>" \
+                        -a "critical_no_fix=<+execution.steps.vuln_scan.output.outputVariables.critical_no_fix_count>" \
+                        "$IMAGE" -y
+
+                      echo "Image signed successfully"
+                    envVariables:
+                      COSIGN_PASSWORD: <+secrets.getValue("cosign_password")>
+
+              # Attach SBOM attestation
+              - step:
+                  type: Run
+                  name: Attach SBOM Attestation
+                  identifier: attach_sbom
+                  spec:
+                    connectorRef: YOUR_DOCKER_CONNECTOR
+                    image: gcr.io/projectsigstore/cosign:v2.2.3
+                    command: |
+                      IMAGE="<+pipeline.variables.registry>/<+pipeline.variables.image_name>:<+pipeline.variables.version>"
+
+                      cosign attest --key /harness/cosign.key \
+                        --tlog-upload=false \
+                        --predicate /harness/sbom.json \
+                        --type cyclonedx \
+                        "$IMAGE" -y
+                    envVariables:
+                      COSIGN_PASSWORD: <+secrets.getValue("cosign_password")>
+
+              # Attach vulnerability attestation
+              - step:
+                  type: Run
+                  name: Attach Vuln Attestation
+                  identifier: attach_vuln_attestation
+                  spec:
+                    connectorRef: YOUR_DOCKER_CONNECTOR
+                    image: gcr.io/projectsigstore/cosign:v2.2.3
+                    command: |
+                      IMAGE="<+pipeline.variables.registry>/<+pipeline.variables.image_name>:<+pipeline.variables.version>"
+
+                      cosign attest --key /harness/cosign.key \
+                        --tlog-upload=false \
+                        --predicate /harness/vuln-predicate.json \
+                        --type vuln \
+                        "$IMAGE" -y
+                    envVariables:
+                      COSIGN_PASSWORD: <+secrets.getValue("cosign_password")>
+
+    # Optional: Deploy to EKS
+    - stage:
+        name: Deploy to EKS
+        identifier: deploy_eks
+        type: Deployment
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: supply_chain_demo
+          environment:
+            environmentRef: dev
+            infrastructureDefinitions:
+              - identifier: eks_dev
+          execution:
+            steps:
+              - step:
+                  type: K8sRollingDeploy
+                  name: Rolling Deployment
+                  identifier: rolling_deploy
+                  spec:
+                    skipDryRun: false
+            rollbackSteps:
+              - step:
+                  type: K8sRollingRollback
+                  name: Rollback
+                  identifier: rollback
+                  spec: {}
+
+  variables:
+    - name: registry
+      type: String
+      description: Container registry URL
+      value: <+input>
+      default: "YOUR_ECR_REGISTRY.dkr.ecr.us-west-2.amazonaws.com"
+    - name: image_name
+      type: String
+      description: Image name
+      value: supply-chain-demo
+    - name: version
+      type: String
+      description: Image version/tag
+      value: <+input>
+      default: "1.0.0"

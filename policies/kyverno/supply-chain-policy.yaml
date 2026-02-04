@@ -1,0 +1,113 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: supply-chain-security
+  annotations:
+    policies.kyverno.io/title: Supply Chain Security Policy
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Comprehensive supply chain security policy that:
+      1. Requires images to be signed
+      2. Verifies images were built through approved pipelines
+      3. Requires vulnerability scan attestation
+      4. Blocks images with > 1 critical vulnerability without a fix
+spec:
+  validationFailureAction: Enforce
+  webhookTimeoutSeconds: 30
+  background: false
+  rules:
+    - name: verify-image-signature-and-provenance
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - demo
+      verifyImages:
+        - imageReferences:
+            - "localhost:5000/*"
+          required: true
+          mutateDigest: true
+          verifyDigest: true
+          # Verify signature exists and was created by approved pipeline
+          attestors:
+            - count: 1
+              entries:
+                - keys:
+                    publicKeys: |-
+                      -----BEGIN PUBLIC KEY-----
+                      # REPLACE THIS with contents of keys/cosign.pub
+                      # Run: cat keys/cosign.pub | pbcopy
+                      -----END PUBLIC KEY-----
+                    rekor:
+                      ignoreTlog: true
+                  annotations:
+                    pipeline: "demo-build|harness-*"
+          # Verify vulnerability scan attestation
+          attestations:
+            - predicateType: https://cosign.sigstore.dev/attestation/vuln/v1
+              attestors:
+                - entries:
+                    - keys:
+                        publicKeys: |-
+                          -----BEGIN PUBLIC KEY-----
+                          # REPLACE THIS with contents of keys/cosign.pub
+                          -----END PUBLIC KEY-----
+                        rekor:
+                          ignoreTlog: true
+              conditions:
+                - all:
+                    # Verify scanner was grype
+                    - key: "{{ scanner }}"
+                      operator: Equals
+                      value: "grype"
+                    # Block if more than 1 critical vuln without fix
+                    - key: "{{ summary.criticalWithoutFix }}"
+                      operator: LessThanOrEquals
+                      value: "1"
+---
+# Optional: Audit mode policy for monitoring without blocking
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: supply-chain-security-audit
+  annotations:
+    policies.kyverno.io/title: Supply Chain Security Policy (Audit Mode)
+    policies.kyverno.io/description: Same as supply-chain-security but in audit mode
+spec:
+  validationFailureAction: Audit  # Only log violations, don't block
+  webhookTimeoutSeconds: 30
+  background: true
+  rules:
+    - name: audit-unsigned-images
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - "*"
+              # Exclude system namespaces
+              namespaceSelector:
+                matchExpressions:
+                  - key: kubernetes.io/metadata.name
+                    operator: NotIn
+                    values:
+                      - kube-system
+                      - kube-public
+                      - kyverno
+      verifyImages:
+        - imageReferences:
+            - "*"
+          required: false
+          attestors:
+            - entries:
+                - keys:
+                    publicKeys: |-
+                      -----BEGIN PUBLIC KEY-----
+                      # REPLACE THIS with contents of keys/cosign.pub
+                      -----END PUBLIC KEY-----
+                    rekor:
+                      ignoreTlog: true

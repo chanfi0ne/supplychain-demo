@@ -1,0 +1,43 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-image-signature
+  annotations:
+    policies.kyverno.io/title: Require Image Signature
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Requires all container images to be signed with cosign.
+      Images without valid signatures will be blocked.
+spec:
+  validationFailureAction: Enforce
+  webhookTimeoutSeconds: 30
+  background: false
+  rules:
+    - name: verify-signature
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - demo
+                - production
+      verifyImages:
+        - imageReferences:
+            - "localhost:5000/*"
+            - "*.dkr.ecr.*.amazonaws.com/*"
+            # Add your registry patterns here
+          attestors:
+            - count: 1
+              entries:
+                - keys:
+                    publicKeys: |-
+                      -----BEGIN PUBLIC KEY-----
+                      # Replace with your cosign.pub content
+                      # Run: cat keys/cosign.pub
+                      -----END PUBLIC KEY-----
+                    rekor:
+                      ignoreTlog: true  # For key-based signing without Rekor
+          mutateDigest: true
+          verifyDigest: true

@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-app-vulnerable
+  namespace: demo
+  labels:
+    app: demo-app
+    version: vulnerable
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-app
+      version: vulnerable
+  template:
+    metadata:
+      labels:
+        app: demo-app
+        version: vulnerable
+    spec:
+      containers:
+        - name: app
+          # This image has > 1 critical vulnerabilities without fixes
+          # Kyverno should BLOCK this deployment
+          image: localhost:5000/supply-chain-demo:1.0.0-vulnerable
+          ports:
+            - containerPort: 8080
+          env:
+            - name: APP_VERSION
+              value: "1.0.0-vulnerable"
