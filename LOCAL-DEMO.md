@@ -176,8 +176,7 @@ docker run --rm -v $(pwd):/workspace --network host \
 #### List All Tags (Shows Signatures and Attestations)
 
 ```bash
-docker run --rm --network host gcr.io/go-containerregistry/crane:latest \
-  ls localhost:5000/demo
+docker run --rm --network host cgr.dev/chainguard/crane ls localhost:5000/demo
 ```
 
 Output shows:
@@ -190,37 +189,32 @@ sha256-<digest>.att    # Attestation artifact
 #### View Image Manifest
 
 ```bash
-docker run --rm --network host gcr.io/go-containerregistry/crane:latest \
-  manifest localhost:5000/demo:v1 | jq
+docker run --rm --network host cgr.dev/chainguard/crane manifest localhost:5000/demo:v1 | jq
 ```
 
 #### View Signature Manifest
 
 ```bash
 # Replace <digest> with actual digest from 'crane ls' output
-docker run --rm --network host gcr.io/go-containerregistry/crane:latest \
-  manifest localhost:5000/demo:sha256-<digest>.sig | jq
+docker run --rm --network host cgr.dev/chainguard/crane manifest localhost:5000/demo:sha256-<digest>.sig | jq
 ```
 
 #### View Attestation Manifest
 
 ```bash
-docker run --rm --network host gcr.io/go-containerregistry/crane:latest \
-  manifest localhost:5000/demo:sha256-<digest>.att | jq
+docker run --rm --network host cgr.dev/chainguard/crane manifest localhost:5000/demo:sha256-<digest>.att | jq
 ```
 
 #### Get Image Digest
 
 ```bash
-docker run --rm --network host gcr.io/go-containerregistry/crane:latest \
-  digest localhost:5000/demo:v1
+docker run --rm --network host cgr.dev/chainguard/crane digest localhost:5000/demo:v1
 ```
 
 #### View Image Config
 
 ```bash
-docker run --rm --network host gcr.io/go-containerregistry/crane:latest \
-  config localhost:5000/demo:v1 | jq
+docker run --rm --network host cgr.dev/chainguard/crane config localhost:5000/demo:v1 | jq
 ```
 
 ### Using ORAS
@@ -345,6 +339,6 @@ rm -f cosign.key cosign.pub vulns.json sbom.json
 | cosign | `gcr.io/projectsigstore/cosign:v2.2.3` | Sign, verify, attest |
 | grype | `anchore/grype:latest` | Vulnerability scanning |
 | syft | `anchore/syft:latest` | SBOM generation |
-| crane | `gcr.io/go-containerregistry/crane:latest` | Registry inspection |
+| crane | `cgr.dev/chainguard/crane` | Registry inspection |
 | oras | `ghcr.io/oras-project/oras:latest` | OCI artifact discovery |
 | registry | `registry:2` | Local container registry |
