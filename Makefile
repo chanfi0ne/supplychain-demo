@@ -27,24 +27,13 @@ setup:
 build:
 	@REGISTRY=$(REGISTRY) IMAGE_NAME=$(IMAGE_NAME) VERSION=$(VERSION) ./scripts/build-sign-attest.sh
 
-policies: update-policies
+policies: generate-policy
 	@echo "Applying Kyverno policies..."
 	@kubectl apply -f k8s/namespace.yaml
-	@kubectl apply -f policies/kyverno/supply-chain-policy.yaml
+	@kubectl apply -f policies/kyverno/supply-chain-policy-final.yaml
 
-update-policies:
-	@echo "Updating policies with signing key..."
-	@if [ -f keys/cosign.pub ]; then \
-		PUB_KEY=$$(cat keys/cosign.pub); \
-		for f in policies/kyverno/*.yaml; do \
-			if grep -q "REPLACE THIS" "$$f"; then \
-				echo "Updating $$f with public key..."; \
-				sed -i.bak "s|-----BEGIN PUBLIC KEY-----.*-----END PUBLIC KEY-----|$$(cat keys/cosign.pub | tr '\n' '~' | sed 's/~/\\n/g')|g" "$$f"; \
-			fi \
-		done \
-	else \
-		echo "Warning: keys/cosign.pub not found. Run 'make setup' first."; \
-	fi
+generate-policy:
+	@./scripts/generate-policy.sh
 
 demo:
 	@./scripts/demo.sh

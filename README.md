@@ -44,11 +44,20 @@ cd supply-chain-demo
 make all
 
 # Or step by step:
-make setup     # Install tools, generate keys, install Kyverno
-make build     # Build, scan, sign, and attest images
-make policies  # Apply Kyverno policies
-make demo      # Run the interactive demo
+make setup     # Install cosign/grype/syft, generate signing keys, install Kyverno
+make build     # Build 3 images (secure, vulnerable, unsigned), scan, sign, attest
+make policies  # Generate policy with your key and apply to cluster
+make demo      # Run interactive demo showing blocked/allowed deployments
 ```
+
+### What `make setup` does:
+1. Installs cosign, grype, and syft (if not present)
+2. **Generates a cosign key pair** in `keys/cosign.key` and `keys/cosign.pub`
+3. Installs Kyverno in your cluster
+
+### What `make policies` does:
+1. Runs `scripts/generate-policy.sh` to create `supply-chain-policy-final.yaml` with your public key embedded
+2. Applies the policy to your cluster
 
 ## Directory Structure
 
