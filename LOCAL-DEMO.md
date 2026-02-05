@@ -21,7 +21,7 @@ docker run -d -p 5000:5000 --name registry registry:2
 
 ```bash
 docker run --rm -v $(pwd):/workspace -w /workspace \
-  gcr.io/projectsigstore/cosign:v2.2.3 generate-key-pair
+  cgr.dev/chainguard/cosign generate-key-pair
 ```
 
 This creates:
@@ -46,7 +46,7 @@ docker push localhost:5000/demo:v1
 
 ```bash
 docker run --rm -v $(pwd):/workspace --network host -e COSIGN_PASSWORD="" \
-  gcr.io/projectsigstore/cosign:v2.2.3 \
+  cgr.dev/chainguard/cosign \
   sign --key /workspace/cosign.key --tlog-upload=false localhost:5000/demo:v1 -y
 ```
 
@@ -56,7 +56,7 @@ docker run --rm -v $(pwd):/workspace --network host -e COSIGN_PASSWORD="" \
 
 ```bash
 docker run --rm -v $(pwd):/workspace --network host \
-  gcr.io/projectsigstore/cosign:v2.2.3 \
+  cgr.dev/chainguard/cosign \
   verify --key /workspace/cosign.pub localhost:5000/demo:v1
 ```
 
@@ -128,7 +128,7 @@ docker run --rm -v $(pwd):/workspace --network host \
 
 # Attach as attestation
 docker run --rm -v $(pwd):/workspace --network host -e COSIGN_PASSWORD="" \
-  gcr.io/projectsigstore/cosign:v2.2.3 \
+  cgr.dev/chainguard/cosign \
   attest --key /workspace/cosign.key --tlog-upload=false \
   --predicate /workspace/vulns.json --type vuln localhost:5000/demo:v1 -y
 ```
@@ -142,7 +142,7 @@ docker run --rm -v $(pwd):/workspace --network host \
 
 # Attach as attestation
 docker run --rm -v $(pwd):/workspace --network host -e COSIGN_PASSWORD="" \
-  gcr.io/projectsigstore/cosign:v2.2.3 \
+  cgr.dev/chainguard/cosign \
   attest --key /workspace/cosign.key --tlog-upload=false \
   --predicate /workspace/sbom.json --type cyclonedx localhost:5000/demo:v1 -y
 ```
@@ -155,7 +155,7 @@ docker run --rm -v $(pwd):/workspace --network host -e COSIGN_PASSWORD="" \
 
 ```bash
 docker run --rm -v $(pwd):/workspace --network host \
-  gcr.io/projectsigstore/cosign:v2.2.3 \
+  cgr.dev/chainguard/cosign \
   verify-attestation --key /workspace/cosign.pub --type vuln localhost:5000/demo:v1
 ```
 
@@ -163,7 +163,7 @@ docker run --rm -v $(pwd):/workspace --network host \
 
 ```bash
 docker run --rm -v $(pwd):/workspace --network host \
-  gcr.io/projectsigstore/cosign:v2.2.3 \
+  cgr.dev/chainguard/cosign \
   verify-attestation --key /workspace/cosign.pub --type cyclonedx localhost:5000/demo:v1
 ```
 
@@ -267,7 +267,7 @@ docker push localhost:5000/demo:unsigned
 
 # Try to verify - THIS WILL FAIL
 docker run --rm -v $(pwd):/workspace --network host \
-  gcr.io/projectsigstore/cosign:v2.2.3 \
+  cgr.dev/chainguard/cosign \
   verify --key /workspace/cosign.pub localhost:5000/demo:unsigned
 ```
 
@@ -283,7 +283,7 @@ docker run --rm --network host anchore/grype:latest localhost:5000/demo:vulnerab
 
 # Sign it anyway (for demo purposes)
 docker run --rm -v $(pwd):/workspace --network host -e COSIGN_PASSWORD="" \
-  gcr.io/projectsigstore/cosign:v2.2.3 \
+  cgr.dev/chainguard/cosign \
   sign --key /workspace/cosign.key --tlog-upload=false localhost:5000/demo:vulnerable -y
 ```
 
@@ -296,7 +296,7 @@ docker push localhost:5000/demo:secure
 
 # Sign
 docker run --rm -v $(pwd):/workspace --network host -e COSIGN_PASSWORD="" \
-  gcr.io/projectsigstore/cosign:v2.2.3 \
+  cgr.dev/chainguard/cosign \
   sign --key /workspace/cosign.key --tlog-upload=false localhost:5000/demo:secure -y
 
 # Scan and attest
@@ -304,17 +304,17 @@ docker run --rm -v $(pwd):/workspace --network host \
   anchore/grype:latest localhost:5000/demo:secure -o json=/workspace/vulns-secure.json
 
 docker run --rm -v $(pwd):/workspace --network host -e COSIGN_PASSWORD="" \
-  gcr.io/projectsigstore/cosign:v2.2.3 \
+  cgr.dev/chainguard/cosign \
   attest --key /workspace/cosign.key --tlog-upload=false \
   --predicate /workspace/vulns-secure.json --type vuln localhost:5000/demo:secure -y
 
 # Verify everything
 docker run --rm -v $(pwd):/workspace --network host \
-  gcr.io/projectsigstore/cosign:v2.2.3 \
+  cgr.dev/chainguard/cosign \
   verify --key /workspace/cosign.pub localhost:5000/demo:secure
 
 docker run --rm -v $(pwd):/workspace --network host \
-  gcr.io/projectsigstore/cosign:v2.2.3 \
+  cgr.dev/chainguard/cosign \
   verify-attestation --key /workspace/cosign.pub --type vuln localhost:5000/demo:secure
 ```
 
@@ -336,7 +336,7 @@ rm -f cosign.key cosign.pub vulns.json sbom.json
 
 | Tool | Image | Purpose |
 |------|-------|---------|
-| cosign | `gcr.io/projectsigstore/cosign:v2.2.3` | Sign, verify, attest |
+| cosign | `cgr.dev/chainguard/cosign` | Sign, verify, attest |
 | grype | `anchore/grype:latest` | Vulnerability scanning |
 | syft | `anchore/syft:latest` | SBOM generation |
 | crane | `cgr.dev/chainguard/crane` | Registry inspection |
