@@ -354,4 +354,18 @@ curl -sL https://github.com/google/go-containerregistry/releases/download/v0.20.
 # or: Darwin_x86_64, Linux_x86_64, Linux_arm64
 
 chmod +x cosign crane
+
+# macOS ARM
+curl -sL https://github.com/oras-project/oras/releases/download/v1.2.0/oras_1.2.0_darwin_arm64.tar.gz | tar xz oras
+
+# macOS Intel
+curl -sL https://github.com/oras-project/oras/releases/download/v1.2.0/oras_1.2.0_darwin_amd64.tar.gz | tar xz oras
+
+# Linux AMD64
+curl -sL https://github.com/oras-project/oras/releases/download/v1.2.0/oras_1.2.0_linux_amd64.tar.gz | tar xz oras
+
+# Linux ARM64
+curl -sL https://github.com/oras-project/oras/releases/download/v1.2.0/oras_1.2.0_linux_arm64.tar.gz | tar xz oras
+
+chmod +x oras
 ```
