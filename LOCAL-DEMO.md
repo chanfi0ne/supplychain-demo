@@ -342,3 +342,16 @@ rm -f cosign.key cosign.pub vulns.json sbom.json
 | crane | `cgr.dev/chainguard/crane` | Registry inspection |
 | oras | `ghcr.io/oras-project/oras:latest` | OCI artifact discovery |
 | registry | `registry:2` | Local container registry |
+
+
+```
+# cosign (check latest version at github.com/sigstore/cosign/releases)
+curl -sL https://github.com/sigstore/cosign/releases/download/v2.4.1/cosign-darwin-arm64 -o cosign  # macOS ARM
+# or: cosign-darwin-amd64, cosign-linux-amd64, cosign-linux-arm64
+
+# crane
+curl -sL https://github.com/google/go-containerregistry/releases/download/v0.20.0/go-containerregistry_Darwin_arm64.tar.gz | tar xz crane
+# or: Darwin_x86_64, Linux_x86_64, Linux_arm64
+
+chmod +x cosign crane
+```
